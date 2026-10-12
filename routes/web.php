@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 
 // PERTEMUAN 2
@@ -148,4 +149,54 @@ Route::post('/form-mahasiswa', function (Request $request) {
     return view('hasil-form', [
         'data' => $data
     ]);
+});
+
+
+// PERTEMUAN 5 — KONEKSI PDO KE DATABASE
+
+Route::get('/mahasiswa/{nim?}', function (?string $nim = null) {
+    try {
+        // Mendapatkan koneksi PDO dari Laravel
+        $pdo = DB::connection()->getPdo();
+
+        // Menyiapkan query JOIN mahasiswa dan program studi
+        $sql = 'SELECT m.nim, m.nama, m.email, m.usia,
+                       p.nama_prodi
+                FROM mahasiswa AS m
+                JOIN program_studi AS p
+                    ON p.id = m.program_studi_id';
+
+        // Filter berdasarkan NIM jika parameter tersedia
+        if ($nim !== null) {
+            $sql .= ' WHERE m.nim = :nim';
+        }
+
+        $sql .= ' ORDER BY m.nim';
+
+        // Prepared statement
+        $statement = $pdo->prepare($sql);
+
+        // Eksekusi query
+        $statement->execute(
+            $nim !== null ? ['nim' => $nim] : []
+        );
+
+        // Mengambil hasil dalam bentuk associative array
+        $daftarMahasiswa = $statement->fetchAll(\PDO::FETCH_ASSOC);
+
+        return view('mahasiswa', compact(
+            'daftarMahasiswa',
+            'nim'
+        ));
+
+    } catch (\Throwable $error) {
+        // Mencatat detail error pada log Laravel
+        report($error);
+
+        // Menampilkan pesan error yang aman
+        return response(
+            'Koneksi atau query basis data gagal. Periksa file .env dan layanan MySQL.',
+            500
+        );
+    }
 });
